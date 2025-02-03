@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <!-- モバイル向けにviewportを設定 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>カスタムエディタ モバイル改良版</title>
+  <style>
+    /* 全体レイアウト */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Courier New", Courier, monospace;
+      background-color: #f0f0f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    /* 編集エリア：下部にキーボード分の余白を確保 */
+    #editor-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      background-color: #fff;
+      margin-bottom: 260px; /* キーボードの高さ分を確保 */
+    }
+    #editor {
+      min-height: 100%;
+      outline: none;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    /* 変換候補ウィンドウ：中央寄せ、上下に流れる */
+    #candidate-window {
+      background-color: #eee;
+      border: 1px solid #ccc;
+      margin: 5px auto;
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-height: 150px;
+      overflow-y: auto;
+      width: 80%;
+    }
+    .candidate {
+      background-color: #fff;
+      border: 1px solid #bbb;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 90%;
+      text-align: center;
+      font-size: 18px;
+    }
+    /* ファイル操作ボタン */
+    #file-ops {
+      display: flex;
+      justify-content: center;
+      margin: 5px;
+    }
+    .file-btn {
+      background-color: #fff;
+      border: 1px solid #ccc;
+      margin: 5px;
+      padding: 10px 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    /* カスタムキーボード：画面下部に固定 */
+    #keyboard {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      background-color: #ddd !important;
+      padding: 10px 0 !important;
+      z-index: 1000 !important;
+    }
+    .key-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .key {
+      background-color: #fff;
+      border: 1px solid #ccc;
+      margin: 0 5px;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 20px;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    .key.special {
+      background-color: #ffdddd;
+    }
+    /* 1段目：左右に向かって回転 */
+    #row1 .key:nth-child(1) { transform: rotate(-10deg); }
+    #row1 .key:nth-child(2) { transform: rotate(-5deg); }
+    #row1 .key:nth-child(3) { transform: rotate(-2deg); }
+    #row1 .key:nth-child(4) { transform: rotate(0deg); }
+    #row1 .key:nth-child(5) { transform: rotate(2deg); }
+    #row1 .key:nth-child(6) { transform: rotate(2deg); }
+    #row1 .key:nth-child(7) { transform: rotate(0deg); }
+    #row1 .key:nth-child(8) { transform: rotate(-2deg); }
+    #row1 .key:nth-child(9) { transform: rotate(-5deg); }
+    #row1 .key:nth-child(10){ transform: rotate(-10deg); }
+    /* 2段目：控えめな回転 */
+    #row2 .key:nth-child(1) { transform: rotate(-8deg); }
+    #row2 .key:nth-child(2) { transform: rotate(-4deg); }
+    #row2 .key:nth-child(3) { transform: rotate(-2deg); }
+    #row2 .key:nth-child(4) { transform: rotate(0deg); }
+    #row2 .key:nth-child(5) { transform: rotate(2deg); }
+    #row2 .key:nth-child(6) { transform: rotate(2deg); }
+    #row2 .key:nth-child(7) { transform: rotate(0deg); }
+    #row2 .key:nth-child(8) { transform: rotate(-2deg); }
+    #row2 .key:nth-child(9) { transform: rotate(-4deg); }
+    /* 3段目：特殊キー付き */
+    #row3 .key:nth-child(1) { transform: rotate(-12deg); }
+    #row3 .key:nth-child(2) { transform: rotate(-6deg); }
+    #row3 .key:nth-child(3) { transform: rotate(-3deg); }
+    #row3 .key:nth-child(4) { transform: rotate(0deg); }
+    #row3 .key:nth-child(5) { transform: rotate(3deg); }
+    #row3 .key:nth-child(6) { transform: rotate(6deg); }
+    #row3 .key:nth-child(7) { transform: rotate(6deg); }
+    #row3 .key:nth-child(8) { transform: rotate(3deg); }
+    #row3 .key:nth-child(9) { transform: rotate(0deg); }
+    /* リターンキー */
+    #row-return {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .key.return {
+      background-color: #e0ffe0;
+      border: 1px solid #ccc;
+      padding: 15px 30px;
+      border-radius: 8px;
+      font-size: 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    /* 4段目：スペースキー */
+    #row4 {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    #row4 .key {
+      flex: 1;
+      text-align: center;
+    }
+    /* 矢印キー */
+    #arrow-keys {
+      display: flex;
+      justify-content: center;
+      margin-top: 5px;
+    }
+    .arrow {
+      background-color: #fff;
+      border: 1px solid #ccc;
+      margin: 5px;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 20px;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body>
+  <!-- 編集エリア -->
+  <div id="editor-container">
+    <div id="editor" contenteditable="true">
+ここに編集対象のテキストが入る。
+例: このチャット内容や、その他のドキュメント...
+    </div>
+  </div>
+  
+  <!-- 変換候補ウィンドウ -->
+  <div id="candidate-window">
+    <div class="candidate">候補1</div>
+    <div class="candidate">候補2</div>
+    <div class="candidate">候補3</div>
+  </div>
+  
+  <!-- ファイル操作ボタン -->
+  <div id="file-ops">
+    <div class="file-btn" onclick="alert('開く機能は未実装')">開く</div>
+    <div class="file-btn" onclick="alert('保存機能は未実装')">保存</div>
+  </div>
+  
+  <!-- カスタムキーボード -->
+  <div id="keyboard">
+    <!-- 1段目 -->
+    <div class="key-row" id="row1">
+      <div class="key" onclick="insertText('Q')">Q</div>
+      <div class="key" onclick="insertText('W')">W</div>
+      <div class="key" onclick="insertText('E')">E</div>
+      <div class="key" onclick="insertText('R')">R</div>
+      <div class="key" onclick="insertText('T')">T</div>
+      <div class="key" onclick="insertText('Y')">Y</div>
+      <div class="key" onclick="insertText('U')">U</div>
+      <div class="key" onclick="insertText('I')">I</div>
+      <div class="key" onclick="insertText('O')">O</div>
+      <div class="key" onclick="insertText('P')">P</div>
+    </div>
+    <!-- 2段目 -->
+    <div class="key-row" id="row2">
+      <div class="key" onclick="insertText('A')">A</div>
+      <div class="key" onclick="insertText('S')">S</div>
+      <div class="key" onclick="insertText('D')">D</div>
+      <div class="key" onclick="insertText('F')">F</div>
+      <div class="key" onclick="insertText('G')">G</div>
+      <div class="key" onclick="insertText('H')">H</div>
+      <div class="key" onclick="insertText('J')">J</div>
+      <div class="key" onclick="insertText('K')">K</div>
+      <div class="key" onclick="insertText('L')">L</div>
+    </div>
+    <!-- 3段目：特殊キー付き -->
+    <div class="key-row" id="row3">
+      <div class="key special" onclick="deleteLeft()">←削除</div>
+      <div class="key" onclick="insertText('Z')">Z</div>
+      <div class="key" onclick="insertText('X')">X</div>
+      <div class="key" onclick="insertText('C')">C</div>
+      <div class="key" onclick="insertText('V')">V</div>
+      <div class="key" onclick="insertText('B')">B</div>
+      <div class="key" onclick="insertText('N')">N</div>
+      <div class="key" onclick="insertText('M')">M</div>
+      <div class="key special" onclick="deleteRight()">削除→</div>
+    </div>
+    <!-- リターンキー行 -->
+    <div class="key-row" id="row-return">
+      <div class="key return" onclick="insertText('\n')">リターン</div>
+    </div>
+    <!-- 4段目：スペースキー -->
+    <div class="key-row" id="row4">
+      <div class="key" style="flex: 1; text-align:center;" onclick="insertText(' ')">スペース</div>
+    </div>
+    <!-- 矢印キー -->
+    <div id="arrow-keys">
+      <div class="arrow" onclick="moveCursor('up')">↑</div>
+      <div class="arrow" onclick="moveCursor('left')">←</div>
+      <div class="arrow" onclick="moveCursor('down')">↓</div>
+      <div class="arrow" onclick="moveCursor('right')">→</div>
+    </div>
+  </div>
+  
+  <script>
+    // エディタにテキストを挿入する処理
+    function insertText(text) {
+      const editor = document.getElementById('editor');
+      let selection = window.getSelection();
+      if (!selection.rangeCount) {
+        editor.focus();
+        selection = window.getSelection();
+      }
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      const textNode = document.createTextNode(text);
+      range.insertNode(textNode);
+      // 挿入したテキストの後にカーソルを移動
+      range.setStartAfter(textNode);
+      range.setEndAfter(textNode);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      editor.focus();
+    }
+    
+    // カーソルの左側文字削除
+    function deleteLeft() {
+      const editor = document.getElementBy
